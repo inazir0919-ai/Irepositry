@@ -1,0 +1,10 @@
+streamlit
+Pillow
+torch
+torchvision
+torchcam
+pandas
+seaborn
+scikit-learn
+
+
