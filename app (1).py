@@ -133,39 +133,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ================= MODEL LOADING DEBUG =================
-def test_load_finetuned_model():
-    import traceback
-    result = {}
-    model_path = "best_shufflenet.pth"
-    try:
-        # Try loading full model directly
-        _ = torch.load(model_path, map_location="cpu")
-        result["full_model_load"] = "✅ Loaded full model successfully."
-    except Exception as e:
-        result["full_model_load"] = f"❌ Failed to load full model: {str(e)}"
-        result["full_model_load_traceback"] = traceback.format_exc()
-
-    try:
-        # Try loading state_dict
-        state_dict = torch.load(model_path, map_location="cpu")
-        if isinstance(state_dict, dict):
-            keys = list(state_dict.keys())[:5]
-            result["state_dict_load"] = f"✅ Loaded state_dict successfully, keys: {keys}"
-        else:
-            result["state_dict_load"] = "❌ Loaded object is not a dict."
-    except Exception as e:
-        result["state_dict_load"] = f"❌ Failed to load state_dict: {str(e)}"
-        result["state_dict_load_traceback"] = traceback.format_exc()
-
-    return result
-
 # ================= MODEL LOADING =================
 @st.cache_resource
 def load_finetuned_shufflenet():
     model = models.shufflenet_v2_x1_0(pretrained=False)
     model.fc = nn.Linear(model.fc.in_features, 2)
-    model.load_state_dict(torch.load("best_shufflenet.pth", map_location="cpu"))
+    # Fix for PyTorch 2.6+ loading:
+    model.load_state_dict(torch.load("best_shufflenet.pth", map_location="cpu", weights_only=False))
     model.eval()
     return model
 
@@ -205,17 +179,6 @@ st.title("🕵️‍♂️ DeepFake Detection Tool")
 st.markdown('<div class="tagline">✨ Unmasking DeepFakes with AI — Upload, Detect, Trust ✨</div>', unsafe_allow_html=True)
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# Debug section - shows model loading results
-st.markdown("## 🧪 Model Loading Debug")
-
-debug_results = test_load_finetuned_model()
-for key, val in debug_results.items():
-    if "traceback" in key:
-        with st.expander(f"Show traceback for {key}"):
-            st.text(val)
-    else:
-        st.write(f"**{key}:** {val}")
-
 # Init session_state
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
@@ -252,7 +215,7 @@ with col2:
     if uploaded_file is not None:
         image = Image.open(uploaded_file).convert("RGB")
         with right_top:
-            st.image(image, caption="Uploaded Image", width=120, output_format="PNG", 
+            st.image(image, caption="Uploaded Image", width=120, output_format="PNG",
                      use_column_width=False, clamp=True, channels="RGB")
 
     # Prediction
@@ -324,12 +287,14 @@ if cm_clicked:
     if model_choice == "Select a model":
         st.warning("⚠️ Please select a model first.")
     else:
-        st.session_state.cm = np.array([[70, 10], [8, 72]])
+        st.session_state.cm = np.array([[70, 10], [8, 72]])  # Example confusion matrix
 
-# Reset
 if reset_clicked:
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.session_state.uploader_key = st.session_state.get("uploader_key", 0) + 1
+    st.session_state.uploader_key += 1
+    st.session_state.prediction = None
+    st.session_state.confidence = None
+    st.session_state.probs = None
+    st.session_state.accuracy = None
+    st.session_state.cm = None
     st.session_state.model_choice = "Select a model"
     st.experimental_rerun()
