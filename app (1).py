@@ -65,7 +65,7 @@ def load_finetuned_shufflenet():
     model.fc = nn.Linear(model.fc.in_features, 2)
 
     try:
-        checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         if "state_dict" in checkpoint:
             model.load_state_dict(checkpoint["state_dict"])
         else:
@@ -142,8 +142,8 @@ with col2:
     if uploaded_file is not None:
         image = Image.open(uploaded_file).convert("RGB")
         with right_top:
-            st.image(image, caption="Uploaded Image", width=120, output_format="PNG",
-                     use_container_width=False, clamp=True, channels="RGB")
+            st.image(image, caption="Uploaded Image", width="content", output_format="PNG",
+                     clamp=True, channels="RGB")
 
     if "prediction" in st.session_state and st.session_state.prediction:
         st.markdown(
