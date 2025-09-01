@@ -130,8 +130,29 @@ st.markdown("""
 def load_finetuned_shufflenet():
     model = models.shufflenet_v2_x1_0(pretrained=False)
     model.fc = nn.Linear(model.fc.in_features, 2)
-    # Use weights_only=False as per PyTorch 2.6 update to allow full loading
-    model.load_state_dict(torch.load("best_shufflenet.pth", map_location="cpu", weights_only=False))
+
+    model_path = "best_shufflenet.pth"
+
+    # Try loading as state_dict first
+    try:
+        state_dict = torch.load(model_path, map_location='cpu')
+        if isinstance(state_dict, dict):
+            model.load_state_dict(state_dict)
+            st.write("✅ Loaded model weights successfully (state_dict).")
+        else:
+            raise ValueError("File content is not a state_dict dictionary.")
+    except Exception as e:
+        st.write(f"⚠️ Failed to load state_dict: {e}")
+        # Try loading full model
+        try:
+            model_full = torch.load(model_path, map_location='cpu')
+            st.write("✅ Loaded full model successfully.")
+            return model_full
+        except Exception as e2:
+            st.write(f"❌ Failed to load full model: {e2}")
+            st.error("Could not load the model. Please verify the model file.")
+            raise e2
+
     model.eval()
     return model
 
@@ -182,7 +203,7 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     uploaded_file = st.file_uploader("📂 Upload an Image", type=["jpg", "jpeg", "png"],
-                                     key=f"uploader_{st.session_state.uploader_key}")
+                                     key=f"uploader_{st.session_state.uploader_key"])
 
     model_choice = st.selectbox(
         "🤖 Select Model",
@@ -207,17 +228,14 @@ with col2:
     if uploaded_file is not None:
         image = Image.open(uploaded_file).convert("RGB")
         with right_top:
-            st.image(image, caption="Uploaded Image", width=120, output_format="PNG", 
+            st.image(image, caption="Uploaded Image", width=120, output_format="PNG",
                      use_column_width=False, clamp=True, channels="RGB")
 
-    # Prediction with safe confidence formatting
+    # Prediction
     if "prediction" in st.session_state:
-        confidence = st.session_state.get("confidence", None)
-        confidence_str = f"{confidence:.2f}%" if isinstance(confidence, (float, int)) else "N/A"
         st.markdown(
-            f'<div class="result-box">Prediction: {st.session_state.prediction} ({confidence_str})</div>',
-            unsafe_allow_html=True
-        )
+            f'<div class="result-box">Prediction: {st.session_state.prediction} '
+            f'({st.session_state.confidence:.2f}%)</div>', unsafe_allow_html=True)
 
     # Probabilities graph
     if "probs" in st.session_state:
@@ -252,31 +270,48 @@ with col2:
 # ================= LOGIC =================
 if analyze_clicked:
     if uploaded_file is None:
-        st.warning("⚠️ Please upload an image before analyzing.")
+        st.warning("⚠️ Please upload an image to analyze.")
     elif model_choice == "Select a model":
         st.warning("⚠️ Please select a model before analyzing.")
     else:
-        if model_choice == "Fine-Tuned ShuffleNetV2":
-            model = load_finetuned_shufflenet()
-        elif model_choice == "ShuffleNetV2":
-            model = load_shufflenet()
-        elif model_choice == "CNN":
-            model = load_cnn()
-        pred_class, probs = predict_image(image, model)
-        st.session_state.probs = probs
-        st.session_state.prediction = "Real" if pred_class == 1 else "Fake"
-        st.session_state.confidence = float(probs[pred_class] * 100)
+        image = Image.open(uploaded_file).convert("RGB")
+
+        try:
+            if model_choice == "Fine-Tuned ShuffleNetV2":
+                model = load_finetuned_shufflenet()
+            elif model_choice == "ShuffleNetV2":
+                model = load_shufflenet()
+            elif model_choice == "CNN":
+                model = load_cnn()
+            else:
+                st.error("Invalid model choice!")
+                model = None
+
+            if model:
+                pred_class, probs = predict_image(image, model)
+                classes = ["Fake", "Real"]
+                pred_label = classes[pred_class]
+                confidence = probs[pred_class] * 100
+
+                st.session_state.prediction = pred_label
+                st.session_state.confidence = confidence
+                st.session_state.probs = probs
+                st.success(f"Prediction: {pred_label} ({confidence:.2f}%)")
+        except Exception as e:
+            st.error(f"Error during prediction: {e}")
 
 if accuracy_clicked:
-    # Example static accuracy value, replace with actual if available
-    st.session_state.accuracy = 93.27
+    # Dummy accuracy for demonstration - replace with your actual accuracy logic
+    st.session_state.accuracy = 92.48
 
 if cm_clicked:
-    # Example confusion matrix, replace with actual if available
-    st.session_state.cm = np.array([[45, 5], [3, 47]])
+    # Dummy confusion matrix for demonstration - replace with your actual confusion matrix
+    import numpy as np
+    st.session_state.cm = np.array([[90, 10], [8, 92]])
 
 if reset_clicked:
-    st.session_state.clear()
     st.session_state.uploader_key += 1
+    for key in ["prediction", "confidence", "probs", "accuracy", "cm"]:
+        if key in st.session_state:
+            del st.session_state[key]
     st.experimental_rerun()
-
