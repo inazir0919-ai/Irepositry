@@ -133,6 +133,33 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ================= MODEL LOADING DEBUG =================
+def test_load_finetuned_model():
+    import traceback
+    result = {}
+    model_path = "best_shufflenet.pth"
+    try:
+        # Try loading full model directly
+        _ = torch.load(model_path, map_location="cpu")
+        result["full_model_load"] = "✅ Loaded full model successfully."
+    except Exception as e:
+        result["full_model_load"] = f"❌ Failed to load full model: {str(e)}"
+        result["full_model_load_traceback"] = traceback.format_exc()
+
+    try:
+        # Try loading state_dict
+        state_dict = torch.load(model_path, map_location="cpu")
+        if isinstance(state_dict, dict):
+            keys = list(state_dict.keys())[:5]
+            result["state_dict_load"] = f"✅ Loaded state_dict successfully, keys: {keys}"
+        else:
+            result["state_dict_load"] = "❌ Loaded object is not a dict."
+    except Exception as e:
+        result["state_dict_load"] = f"❌ Failed to load state_dict: {str(e)}"
+        result["state_dict_load_traceback"] = traceback.format_exc()
+
+    return result
+
 # ================= MODEL LOADING =================
 @st.cache_resource
 def load_finetuned_shufflenet():
@@ -177,6 +204,17 @@ def predict_image(image, model):
 st.title("🕵️‍♂️ DeepFake Detection Tool")
 st.markdown('<div class="tagline">✨ Unmasking DeepFakes with AI — Upload, Detect, Trust ✨</div>', unsafe_allow_html=True)
 st.markdown("<hr>", unsafe_allow_html=True)
+
+# Debug section - shows model loading results
+st.markdown("## 🧪 Model Loading Debug")
+
+debug_results = test_load_finetuned_model()
+for key, val in debug_results.items():
+    if "traceback" in key:
+        with st.expander(f"Show traceback for {key}"):
+            st.text(val)
+    else:
+        st.write(f"**{key}:** {val}")
 
 # Init session_state
 if "uploader_key" not in st.session_state:
@@ -294,4 +332,4 @@ if reset_clicked:
         del st.session_state[key]
     st.session_state.uploader_key = st.session_state.get("uploader_key", 0) + 1
     st.session_state.model_choice = "Select a model"
-    st.rerun()
+    st.experimental_rerun()
