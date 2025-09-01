@@ -121,14 +121,8 @@ st.markdown("""
 def load_finetuned_shufflenet():
     model = models.shufflenet_v2_x1_0(pretrained=False)
     model.fc = nn.Linear(model.fc.in_features, 2)
-
     checkpoint = torch.load("best_shufflenet.pth", map_location="cpu")
-
-    if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
-        model.load_state_dict(checkpoint["model_state_dict"])
-    else:
-        model.load_state_dict(checkpoint)
-
+    model.load_state_dict(checkpoint["model_state_dict"])  # ✅ FIX
     model.eval()
     return model
 
@@ -163,21 +157,25 @@ def predict_image(image, model):
         pred_class = np.argmax(probs)
     return pred_class, probs
 
-# ================= INIT SESSION STATE =================
-for key in ["prediction", "confidence", "probs", "accuracy", "cm"]:
-    if key not in st.session_state:
-        st.session_state[key] = None
-
-if "uploader_key" not in st.session_state:
-    st.session_state.uploader_key = 0
-if "model_choice" not in st.session_state:
-    st.session_state.model_choice = "Select a model"
-
 # ================= UI =================
 st.title("🕵️‍♂️ DeepFake Detection Tool")
 st.markdown('<div class="tagline">✨ Unmasking DeepFakes with AI — Upload, Detect, Trust ✨</div>', unsafe_allow_html=True)
 st.markdown("<hr>", unsafe_allow_html=True)
 
+# Init session_state safely
+for key, default in {
+    "uploader_key": 0,
+    "model_choice": "Select a model",
+    "prediction": None,
+    "confidence": None,
+    "probs": None,
+    "accuracy": None,
+    "cm": None,
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+# Layout
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -203,17 +201,20 @@ with col1:
 with col2:
     right_top, right_bottom = st.columns(2)
 
+    # Uploaded Image
     if uploaded_file is not None:
         image = Image.open(uploaded_file).convert("RGB")
         with right_top:
             st.image(image, caption="Uploaded Image", width=120, output_format="PNG",
                      use_column_width=False, clamp=True, channels="RGB")
 
+    # Prediction
     if st.session_state.prediction is not None and st.session_state.confidence is not None:
         st.markdown(
             f'<div class="result-box">Prediction: {st.session_state.prediction} '
             f'({st.session_state.confidence:.2f}%)</div>', unsafe_allow_html=True)
 
+    # Probabilities graph
     if st.session_state.probs is not None:
         with right_bottom:
             fig, ax = plt.subplots(figsize=(2, 2))
@@ -224,12 +225,14 @@ with col2:
             ax.set_title("Prediction Probabilities")
             st.pyplot(fig)
 
+    # Accuracy
     if st.session_state.accuracy is not None:
         st.markdown(
             f'<div class="accuracy-box">📊 Model Accuracy: {st.session_state.accuracy:.2f}%</div>',
             unsafe_allow_html=True
         )
 
+    # Confusion Matrix
     if st.session_state.cm is not None:
         with right_bottom:
             fig, ax = plt.subplots(figsize=(2, 2))
@@ -274,12 +277,11 @@ if cm_clicked:
     if model_choice == "Select a model":
         st.warning("⚠️ Please select a model first.")
     else:
-        st.session_state.cm = np.array([[70, 10], [8, 72]])
+        st.session_state.cm = np.array([[70, 10], [8, 72]])  # Example confusion matrix
 
 if reset_clicked:
-    st.session_state.uploader_key += 1
     for key in ["prediction", "confidence", "probs", "accuracy", "cm"]:
         st.session_state[key] = None
     st.session_state.model_choice = "Select a model"
+    st.session_state.uploader_key += 1
     st.experimental_rerun()
-
