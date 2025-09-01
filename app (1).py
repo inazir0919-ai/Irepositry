@@ -19,8 +19,6 @@ st.markdown("""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #fff;
     }
-
-    /* Title */
     h1 {
         text-align: center;
         font-weight: 800;
@@ -30,8 +28,6 @@ st.markdown("""
         text-shadow: 2px 2px 10px rgba(0,0,0,0.7);
         letter-spacing: 1px;
     }
-
-    /* Sticky tagline */
     .tagline {
         text-align: center;
         font-size: 1.2rem;
@@ -47,8 +43,6 @@ st.markdown("""
         top: 0;
         z-index: 999;
     }
-
-    /* Result & Accuracy Boxes (Glassmorphism + Glow) */
     .result-box, .accuracy-box {
         padding: 18px;
         border-radius: 15px;
@@ -76,8 +70,6 @@ st.markdown("""
         transform: scale(1.05);
         box-shadow: 0 0 20px rgba(255,255,255,0.3);
     }
-
-    /* Uploaded Image */
     .uploaded-img {
         border-radius: 12px;
         box-shadow: 0px 6px 16px rgba(0,0,0,0.5);
@@ -89,8 +81,6 @@ st.markdown("""
     .uploaded-img:hover {
         transform: scale(1.08);
     }
-
-    /* Buttons */
     div.stButton > button {
         border-radius: 12px;
         font-weight: bold;
@@ -106,8 +96,6 @@ st.markdown("""
         transform: translateY(-3px) scale(1.05);
         box-shadow: 0 0 15px rgba(255,204,0,0.7);
     }
-
-    /* File Uploader */
     .stFileUploader {
         background: rgba(255,255,255,0.1);
         border: 2px dashed #ffcc70;
@@ -118,14 +106,10 @@ st.markdown("""
     .stFileUploader:hover {
         border: 2px solid #ff9900;
     }
-
-    /* HR line */
     hr {
         margin: 1rem 0;
         border: 1px solid rgba(255,255,255,0.2);
     }
-
-    /* Fade-in animation */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
@@ -138,8 +122,14 @@ st.markdown("""
 def load_finetuned_shufflenet():
     model = models.shufflenet_v2_x1_0(pretrained=False)
     model.fc = nn.Linear(model.fc.in_features, 2)
-    # Fix for PyTorch 2.6+ loading:
-    model.load_state_dict(torch.load("best_shufflenet.pth", map_location="cpu", weights_only=False))
+
+    checkpoint = torch.load("best_shufflenet.pth", map_location="cpu")
+
+    if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+        model.load_state_dict(checkpoint["model_state_dict"])
+    else:
+        model.load_state_dict(checkpoint)
+
     model.eval()
     return model
 
@@ -179,13 +169,11 @@ st.title("🕵️‍♂️ DeepFake Detection Tool")
 st.markdown('<div class="tagline">✨ Unmasking DeepFakes with AI — Upload, Detect, Trust ✨</div>', unsafe_allow_html=True)
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# Init session_state
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
 if "model_choice" not in st.session_state:
     st.session_state.model_choice = "Select a model"
 
-# Layout
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -211,20 +199,17 @@ with col1:
 with col2:
     right_top, right_bottom = st.columns(2)
 
-    # Uploaded Image (small & centered)
     if uploaded_file is not None:
         image = Image.open(uploaded_file).convert("RGB")
         with right_top:
             st.image(image, caption="Uploaded Image", width=120, output_format="PNG",
                      use_column_width=False, clamp=True, channels="RGB")
 
-    # Prediction
     if "prediction" in st.session_state:
         st.markdown(
             f'<div class="result-box">Prediction: {st.session_state.prediction} '
             f'({st.session_state.confidence:.2f}%)</div>', unsafe_allow_html=True)
 
-    # Probabilities graph
     if "probs" in st.session_state:
         with right_bottom:
             fig, ax = plt.subplots(figsize=(2, 2))
@@ -235,14 +220,12 @@ with col2:
             ax.set_title("Prediction Probabilities")
             st.pyplot(fig)
 
-    # Accuracy
     if "accuracy" in st.session_state:
         st.markdown(
             f'<div class="accuracy-box">📊 Model Accuracy: {st.session_state.accuracy:.2f}%</div>',
             unsafe_allow_html=True
         )
 
-    # Confusion Matrix (small)
     if "cm" in st.session_state:
         with right_bottom:
             fig, ax = plt.subplots(figsize=(2, 2))
@@ -287,7 +270,7 @@ if cm_clicked:
     if model_choice == "Select a model":
         st.warning("⚠️ Please select a model first.")
     else:
-        st.session_state.cm = np.array([[70, 10], [8, 72]])  # Example confusion matrix
+        st.session_state.cm = np.array([[70, 10], [8, 72]])
 
 if reset_clicked:
     st.session_state.uploader_key += 1
@@ -298,3 +281,4 @@ if reset_clicked:
     st.session_state.cm = None
     st.session_state.model_choice = "Select a model"
     st.experimental_rerun()
+
