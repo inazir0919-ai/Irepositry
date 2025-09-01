@@ -19,7 +19,6 @@ st.markdown("""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #fff;
     }
-
     /* Title */
     h1 {
         text-align: center;
@@ -30,7 +29,6 @@ st.markdown("""
         text-shadow: 2px 2px 10px rgba(0,0,0,0.7);
         letter-spacing: 1px;
     }
-
     /* Sticky tagline */
     .tagline {
         text-align: center;
@@ -47,7 +45,6 @@ st.markdown("""
         top: 0;
         z-index: 999;
     }
-
     /* Result & Accuracy Boxes (Glassmorphism + Glow) */
     .result-box, .accuracy-box {
         padding: 18px;
@@ -76,7 +73,6 @@ st.markdown("""
         transform: scale(1.05);
         box-shadow: 0 0 20px rgba(255,255,255,0.3);
     }
-
     /* Uploaded Image */
     .uploaded-img {
         border-radius: 12px;
@@ -89,7 +85,6 @@ st.markdown("""
     .uploaded-img:hover {
         transform: scale(1.08);
     }
-
     /* Buttons */
     div.stButton > button {
         border-radius: 12px;
@@ -106,7 +101,6 @@ st.markdown("""
         transform: translateY(-3px) scale(1.05);
         box-shadow: 0 0 15px rgba(255,204,0,0.7);
     }
-
     /* File Uploader */
     .stFileUploader {
         background: rgba(255,255,255,0.1);
@@ -118,13 +112,11 @@ st.markdown("""
     .stFileUploader:hover {
         border: 2px solid #ff9900;
     }
-
     /* HR line */
     hr {
         margin: 1rem 0;
         border: 1px solid rgba(255,255,255,0.2);
     }
-
     /* Fade-in animation */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(20px); }
@@ -138,7 +130,7 @@ st.markdown("""
 def load_finetuned_shufflenet():
     model = models.shufflenet_v2_x1_0(pretrained=False)
     model.fc = nn.Linear(model.fc.in_features, 2)
-    # Fix for PyTorch 2.6+ loading:
+    # Use weights_only=False as per PyTorch 2.6 update to allow full loading
     model.load_state_dict(torch.load("best_shufflenet.pth", map_location="cpu", weights_only=False))
     model.eval()
     return model
@@ -215,14 +207,17 @@ with col2:
     if uploaded_file is not None:
         image = Image.open(uploaded_file).convert("RGB")
         with right_top:
-            st.image(image, caption="Uploaded Image", width=120, output_format="PNG",
+            st.image(image, caption="Uploaded Image", width=120, output_format="PNG", 
                      use_column_width=False, clamp=True, channels="RGB")
 
-    # Prediction
+    # Prediction with safe confidence formatting
     if "prediction" in st.session_state:
+        confidence = st.session_state.get("confidence", None)
+        confidence_str = f"{confidence:.2f}%" if isinstance(confidence, (float, int)) else "N/A"
         st.markdown(
-            f'<div class="result-box">Prediction: {st.session_state.prediction} '
-            f'({st.session_state.confidence:.2f}%)</div>', unsafe_allow_html=True)
+            f'<div class="result-box">Prediction: {st.session_state.prediction} ({confidence_str})</div>',
+            unsafe_allow_html=True
+        )
 
     # Probabilities graph
     if "probs" in st.session_state:
@@ -268,36 +263,20 @@ if analyze_clicked:
         elif model_choice == "CNN":
             model = load_cnn()
         pred_class, probs = predict_image(image, model)
-        st.session_state.prediction = "Real" if pred_class == 1 else "Fake"
-        st.session_state.confidence = probs[pred_class] * 100
         st.session_state.probs = probs
+        st.session_state.prediction = "Real" if pred_class == 1 else "Fake"
+        st.session_state.confidence = float(probs[pred_class] * 100)
 
 if accuracy_clicked:
-    if model_choice == "Select a model":
-        st.warning("⚠️ Please select a model first.")
-    else:
-        model_acc = {
-            "Fine-Tuned ShuffleNetV2": 91.3,
-            "ShuffleNetV2": 85.7,
-            "CNN": 83.2
-        }
-        st.session_state.accuracy = model_acc.get(model_choice, 80.0)
+    # Example static accuracy value, replace with actual if available
+    st.session_state.accuracy = 93.27
 
 if cm_clicked:
-    if model_choice == "Select a model":
-        st.warning("⚠️ Please select a model first.")
-    else:
-        st.session_state.cm = np.array([[70, 10], [8, 72]])  # Example confusion matrix
+    # Example confusion matrix, replace with actual if available
+    st.session_state.cm = np.array([[45, 5], [3, 47]])
 
 if reset_clicked:
+    st.session_state.clear()
     st.session_state.uploader_key += 1
-    st.session_state.prediction = None
-    st.session_state.confidence = None
-    st.session_state.probs = None
-    st.session_state.accuracy = None
-    st.session_state.cm = None
-    st.session_state.model_choice = "Select a model"
     st.experimental_rerun()
 
-
-  
