@@ -6,6 +6,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import os
 
 # ================= CONFIG =================
 st.set_page_config(page_title="DeepFake Detector", page_icon="🕵️‍♂️", layout="wide")
@@ -13,6 +14,7 @@ st.set_page_config(page_title="DeepFake Detector", page_icon="🕵️‍♂️",
 # ================= CUSTOM CSS =================
 st.markdown("""
 <style>
+    /* Background gradient */
     .stApp {
         background: linear-gradient(135deg, #141e30, #243b55);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -121,8 +123,9 @@ st.markdown("""
 def load_finetuned_shufflenet():
     model = models.shufflenet_v2_x1_0(pretrained=False)
     model.fc = nn.Linear(model.fc.in_features, 2)
-    checkpoint = torch.load("best_shufflenet.pth", map_location="cpu")
-    model.load_state_dict(checkpoint["model_state_dict"])  # ✅ FIX
+    # Use the uploaded .pth file path
+    checkpoint_path = "/mount/src/irepositry/best_shufflenet (1).pth"
+    model.load_state_dict(torch.load(checkpoint_path, map_location="cpu", weights_only=False))
     model.eval()
     return model
 
@@ -162,18 +165,11 @@ st.title("🕵️‍♂️ DeepFake Detection Tool")
 st.markdown('<div class="tagline">✨ Unmasking DeepFakes with AI — Upload, Detect, Trust ✨</div>', unsafe_allow_html=True)
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# Init session_state safely
-for key, default in {
-    "uploader_key": 0,
-    "model_choice": "Select a model",
-    "prediction": None,
-    "confidence": None,
-    "probs": None,
-    "accuracy": None,
-    "cm": None,
-}.items():
-    if key not in st.session_state:
-        st.session_state[key] = default
+# Init session_state
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+if "model_choice" not in st.session_state:
+    st.session_state.model_choice = "Select a model"
 
 # Layout
 col1, col2 = st.columns([1, 1])
@@ -201,21 +197,19 @@ with col1:
 with col2:
     right_top, right_bottom = st.columns(2)
 
-    # Uploaded Image
     if uploaded_file is not None:
         image = Image.open(uploaded_file).convert("RGB")
         with right_top:
-            st.image(image, caption="Uploaded Image", width=120, output_format="PNG",
-                     use_column_width=False, clamp=True, channels="RGB")
+            st.image(image, caption="Uploaded Image", width=120,
+                     output_format="PNG", clamp=True, channels="RGB",
+                     use_container_width=False)
 
-    # Prediction
-    if st.session_state.prediction is not None and st.session_state.confidence is not None:
+    if "prediction" in st.session_state and st.session_state.prediction:
         st.markdown(
             f'<div class="result-box">Prediction: {st.session_state.prediction} '
             f'({st.session_state.confidence:.2f}%)</div>', unsafe_allow_html=True)
 
-    # Probabilities graph
-    if st.session_state.probs is not None:
+    if "probs" in st.session_state and st.session_state.probs is not None:
         with right_bottom:
             fig, ax = plt.subplots(figsize=(2, 2))
             classes = ["Fake", "Real"]
@@ -225,15 +219,13 @@ with col2:
             ax.set_title("Prediction Probabilities")
             st.pyplot(fig)
 
-    # Accuracy
-    if st.session_state.accuracy is not None:
+    if "accuracy" in st.session_state and st.session_state.accuracy is not None:
         st.markdown(
             f'<div class="accuracy-box">📊 Model Accuracy: {st.session_state.accuracy:.2f}%</div>',
             unsafe_allow_html=True
         )
 
-    # Confusion Matrix
-    if st.session_state.cm is not None:
+    if "cm" in st.session_state and st.session_state.cm is not None:
         with right_bottom:
             fig, ax = plt.subplots(figsize=(2, 2))
             sns.heatmap(st.session_state.cm, annot=True, fmt="d", cmap="Purples",
@@ -277,11 +269,14 @@ if cm_clicked:
     if model_choice == "Select a model":
         st.warning("⚠️ Please select a model first.")
     else:
-        st.session_state.cm = np.array([[70, 10], [8, 72]])  # Example confusion matrix
+        st.session_state.cm = np.array([[70, 10], [8, 72]])  # Example CM
 
 if reset_clicked:
-    for key in ["prediction", "confidence", "probs", "accuracy", "cm"]:
-        st.session_state[key] = None
-    st.session_state.model_choice = "Select a model"
     st.session_state.uploader_key += 1
+    st.session_state.prediction = None
+    st.session_state.confidence = None
+    st.session_state.probs = None
+    st.session_state.accuracy = None
+    st.session_state.cm = None
+    st.session_state.model_choice = "Select a model"
     st.experimental_rerun()
