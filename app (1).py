@@ -13,7 +13,6 @@ st.set_page_config(page_title="DeepFake Detector", page_icon="🕵️‍♂️",
 # ================= CUSTOM CSS =================
 st.markdown("""
 <style>
-    /* Background gradient */
     .stApp {
         background: linear-gradient(135deg, #141e30, #243b55);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -164,15 +163,20 @@ def predict_image(image, model):
         pred_class = np.argmax(probs)
     return pred_class, probs
 
-# ================= UI =================
-st.title("🕵️‍♂️ DeepFake Detection Tool")
-st.markdown('<div class="tagline">✨ Unmasking DeepFakes with AI — Upload, Detect, Trust ✨</div>', unsafe_allow_html=True)
-st.markdown("<hr>", unsafe_allow_html=True)
+# ================= INIT SESSION STATE =================
+for key in ["prediction", "confidence", "probs", "accuracy", "cm"]:
+    if key not in st.session_state:
+        st.session_state[key] = None
 
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
 if "model_choice" not in st.session_state:
     st.session_state.model_choice = "Select a model"
+
+# ================= UI =================
+st.title("🕵️‍♂️ DeepFake Detection Tool")
+st.markdown('<div class="tagline">✨ Unmasking DeepFakes with AI — Upload, Detect, Trust ✨</div>', unsafe_allow_html=True)
+st.markdown("<hr>", unsafe_allow_html=True)
 
 col1, col2 = st.columns([1, 1])
 
@@ -205,12 +209,12 @@ with col2:
             st.image(image, caption="Uploaded Image", width=120, output_format="PNG",
                      use_column_width=False, clamp=True, channels="RGB")
 
-    if "prediction" in st.session_state:
+    if st.session_state.prediction is not None and st.session_state.confidence is not None:
         st.markdown(
             f'<div class="result-box">Prediction: {st.session_state.prediction} '
             f'({st.session_state.confidence:.2f}%)</div>', unsafe_allow_html=True)
 
-    if "probs" in st.session_state:
+    if st.session_state.probs is not None:
         with right_bottom:
             fig, ax = plt.subplots(figsize=(2, 2))
             classes = ["Fake", "Real"]
@@ -220,13 +224,13 @@ with col2:
             ax.set_title("Prediction Probabilities")
             st.pyplot(fig)
 
-    if "accuracy" in st.session_state:
+    if st.session_state.accuracy is not None:
         st.markdown(
             f'<div class="accuracy-box">📊 Model Accuracy: {st.session_state.accuracy:.2f}%</div>',
             unsafe_allow_html=True
         )
 
-    if "cm" in st.session_state:
+    if st.session_state.cm is not None:
         with right_bottom:
             fig, ax = plt.subplots(figsize=(2, 2))
             sns.heatmap(st.session_state.cm, annot=True, fmt="d", cmap="Purples",
@@ -274,11 +278,8 @@ if cm_clicked:
 
 if reset_clicked:
     st.session_state.uploader_key += 1
-    st.session_state.prediction = None
-    st.session_state.confidence = None
-    st.session_state.probs = None
-    st.session_state.accuracy = None
-    st.session_state.cm = None
+    for key in ["prediction", "confidence", "probs", "accuracy", "cm"]:
+        st.session_state[key] = None
     st.session_state.model_choice = "Select a model"
     st.experimental_rerun()
 
